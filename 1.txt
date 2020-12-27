@@ -1,0 +1,22 @@
+program a¹þ¹þ;
+const a:=10£»
+var b,c d,;
+procedure p();
+begin
+	c=b+a
+	write(c);  
+	if c>0 then
+		d:=c+d;
+	c:=x+y;
+	write(c)
+end
+begin
+	read(b);
+	while b<>0 do
+	begin
+		call p(1 2);  
+		read(c);
+		write1(2*c);
+		read(b);
+	end
+end
