@@ -10,6 +10,9 @@ fstream output;
 int row, col;
 int col_error;
 int la_error=0;
+char text[3000];
+int fcnt=0;
+int fi=0;
 
 bool isDigit(char ch) //是否为数字
 {
@@ -67,10 +70,11 @@ string ConCat(string str, char ch) //把ch的内容加入str
 
 void Retract()
 {
-    if (!input.eof())
-    {
-        input.seekg(-1, ios::cur);
-    }
+    // if (!input.eof())
+    // {
+    //     input.seekg(-1, ios::cur);
+    // }
+    fi--;
 }
 
 bool ischar(char ch)
@@ -104,6 +108,14 @@ void LA()
         cout << "Can't open the output file!" << endl;
         exit(0);
     }
+    char ch;
+    ch = input.get();
+    while (!input.eof())
+    {
+        text[fcnt++] = ch;
+        ch = input.get();
+    }
+    text[fcnt] = '\0';
 
     //header
     time_t curTime;
@@ -116,12 +128,12 @@ void LA()
     output << endl;
 
     string strToken;
-    char ch;
     row = 1;
     col = 1;
-    while (!input.eof())
+
+    while (fi<fcnt)
     {
-        ch = input.get();
+        ch = text[fi++];
         if (isBC(ch))
             strToken = "";
         else if (isLetter(ch))
@@ -130,7 +142,7 @@ void LA()
             {
                 strToken = ConCat(strToken, ch);
                 col++;
-                ch = input.get();
+                ch = text[fi++];
             }
             if (isKeyWord(strToken))
             {
@@ -150,7 +162,7 @@ void LA()
             {
                 strToken = ConCat(strToken, ch);
                 col++;
-                ch = input.get();
+                ch = text[fi++];
             }
             if (isLetter(ch))
             {
@@ -161,7 +173,7 @@ void LA()
                 {
                     strToken = ConCat(strToken, ch);
                     col++;
-                    ch = input.get();
+                    ch = text[fi++];
                 }
                 output << "\"" << strToken << "\"" << endl;
                 cout << "\"" << strToken << "\"" << endl;
@@ -181,7 +193,7 @@ void LA()
         else if (ch == '<')
         {
             col++;
-            ch = input.get();
+            ch = text[fi++];
             if (ch == '>')
             {
                 col++;
@@ -201,7 +213,7 @@ void LA()
         else if (ch == '>')
         {
             col++;
-            ch = input.get();
+            ch = text[fi++];
             if (ch == '=')
             {
                 col++;
@@ -216,7 +228,7 @@ void LA()
         else if (ch == ':')
         {
             col++;
-            ch = input.get();
+            ch = text[fi++];
             if (ch == '=')
             {
                 col++;
@@ -239,13 +251,13 @@ void LA()
         else if (ch == '*')
         {
             col++;
-            ch = input.get();
+            ch = text[fi++];
             if (ch=='*'){
                 output << "$POW  **" << " " << row << " " << col << endl;
             }
             else{
                 Retract();
-                output << "$MOP  " << ch << " " << row << " " << col << endl;
+                output << "$MOP  " << "*" << " " << row << " " << col << endl;
             }
         }
         else if (ch == '/')
@@ -271,7 +283,7 @@ void LA()
             	col++;
             	if (ch<0){ //汉字首字节 
             		strToken = ConCat(strToken, ch);
-            		ch = input.get();
+            		ch = text[fi++];
             		if (ch<0||ch>63)
             			strToken = ConCat(strToken, ch);
             		else{
@@ -281,7 +293,7 @@ void LA()
             	else{
             		strToken = ConCat(strToken, ch);
             	}
-                ch = input.get();
+                ch = text[fi++];
             }
             output << "[Lexical ERROR] " << row << " " << col_error  << " UNKNOWNWORD： " << strToken << endl;
             cout << "[Lexical ERROR]  " << "[" <<row << "," << col_error  << "]" << " UNKNOWNWORD： " << strToken << endl;
