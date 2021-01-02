@@ -71,26 +71,22 @@ void vardecl(int lev, int &dx);
 void condecl(int lev, int &dx);
 void Const(int lev, int &dx);
 void proc(int lev, int &dx);
-void body(int ctx, int lev);
-void statement(int ctx, int lev);
-void lexp(int ctx, int lev);
-void exp(int ctx, int lev);
-void term(int ctx, int lev);
-void factor(int ctx, int lev);
+void body(int lev);
+void statement(int lev);
+void lexp(int lev);
+void exp(int lev);
+void term(int lev);
+void factor(int lev);
 int base(int l, int *S, int b);
 void interpret();
+void printtable();
 
 //在符号表中加入一项
 //pdx 当前应分配的变量的相对地址 分配后加1
 void enter(enum object k, int lev, int &pdx)
 {
     string nm = word->value;
-    for (int i=0; i<ptx; i++){
-        if (table[i].name == nm){
-            sendError(26);  //该符号已定义
-            return;
-        }
-    }
+
     table[ptx].name = nm;
     table[ptx].kind = k;
     switch(k)
@@ -118,9 +114,30 @@ void enter(enum object k, int lev, int &pdx)
 int position(string idt)
 {
     int i = ptx-1;
-    while (i>=0&&table[i].name!=idt)
+    int lnow;
+    if (i>=0)
+        lnow = table[i].level;
+    while (i>=0){
+        if (table[i].level<=lnow&&table[i].name==idt)
+            return i;
+        if (table[i].level<lnow)
+            lnow = table[i].level;
         i--;
-    return i;
+    }
+    return -1;
+}
+
+int find_in_cur(string idt)
+{
+    int i = ptx-1;
+    int lnow = table[i].level;
+    while (i>=0&&table[i].level==lnow)
+    {
+        if (table[i].name==idt)
+            return i;
+        i--;
+    }
+    return -1;
 }
 
 //生成中间代码
@@ -328,7 +345,7 @@ void prog(){
         }
         
     }
-    block(0,3,0);
+    block(1,3,0);
 }
 
 /*
@@ -343,10 +360,6 @@ void block(int lev, int dxx, int txx){
     int ctemp = cx;
     gen(JMP,0,0);
 
-    // if ((word+1)->key=="keyword"){
-    //     sendError(3);
-    //     word++;
-    // }
     if (word->value=="const"&&word->key=="keyword"){
         word++;
         condecl(lev,dx);
@@ -363,10 +376,8 @@ void block(int lev, int dxx, int txx){
         sendError(3);
         word++;
     }
-    int cur_tx = ptx;
 
     if (word->value=="procedure"&&word->key=="keyword"){
-        cur_tx = ptx+1;
         word++;
         proc(lev,dx);
     }
@@ -375,15 +386,12 @@ void block(int lev, int dxx, int txx){
         word++;
     }
 
-    //proc结束
-    ptx = cur_tx;
-
    // code[table[txx].adr].a = cx;  //生成当前过程的代码
     code[ctemp].a = cx;
     //cout << cx << endl;
     gen(INT,0,dx);   //分配内存
 
-    body(cur_tx,lev);
+    body(lev);
     table[txx].size = dx;
     gen(OPR,0,0);
 }
@@ -393,7 +401,11 @@ void block(int lev, int dxx, int txx){
 */
 void vardecl(int lev, int &dx){
     if (word->key=="ID"){
-        enter(variable,lev,dx);
+        int i = find_in_cur(word->value);
+        if (i==-1)
+            enter(variable,lev,dx);
+        else
+            sendError(26);
         word++;
     }
     else{
@@ -633,9 +645,8 @@ void proc(int lev, int &dx){
 
 /*
 <body> -> begin <statement>{;<statement>}end
-ctx: 开始的tx
 */
-void body(int ctx, int lev){
+void body(int lev){
     if (word->value=="begin"&&word->key=="keyword"){
         word++;
         node *end=all+cnt,*temp=word;
@@ -655,7 +666,7 @@ void body(int ctx, int lev){
     else{
         sendError(17); //missing begin
     }
-    statement(ctx,lev);
+    statement(lev);
 
     while (word->value!="end"&&word<all+cnt){
         if (word->value==";"){
@@ -668,7 +679,7 @@ void body(int ctx, int lev){
             sendError(18);
             break;
         }
-        statement(ctx,lev);
+        statement(lev);
     }
     // while (word->value==";"&&word->key=="EOP" ){
     //     word++;
@@ -703,7 +714,7 @@ void body(int ctx, int lev){
                |read (<id>{,<exp>})
                |write (<exp>{,<exp>})
 */
-void statement(int ctx, int lev){
+void statement(int lev){
     //<id> := <exp>
     if (word->key=="ID"){
         int i = position(word->value);
@@ -714,14 +725,14 @@ void statement(int ctx, int lev){
         word++;
         if (word->value==":="&&word->key=="assignment"){
             word++;
-            exp(ctx,lev);
+            exp(lev);
             gen(STO,lev-table[i].level,table[i].adr);
         }
         else{           
             if (word->value=="="){
                 sendError(13);
                 word++;
-                exp(ctx,lev);
+                exp(lev);
             }
             // else if (word->key=="ID"){
             //     sendError(14);
@@ -739,7 +750,7 @@ void statement(int ctx, int lev){
     //if <lexp> then <statement>[else <statement>]
     else if (word->value=="if"&&word->key=="keyword"){
         word++;
-        lexp(ctx,lev);
+        lexp(lev);
         if (word->value=="then"&&word->key=="keyword"){
             word++;
         }
@@ -751,13 +762,13 @@ void statement(int ctx, int lev){
         }
         int cx1 = cx;  //jpc的指令
         gen(JPC,0,0);
-        statement(ctx,lev);
+        statement(lev);
         int cx2 = cx;  //jmp的指令
         gen(JMP,0,0);
         code[cx1].a = cx;
         if (word->value=="else"&&word->key=="keyword"){
             word++;
-            statement(ctx,lev);
+            statement(lev);
         }
         code[cx2].a = cx;
     }
@@ -766,7 +777,7 @@ void statement(int ctx, int lev){
     else if (word->value=="while"&&word->key=="keyword"){
         word++;
         int cx1 = cx;
-        lexp(ctx,lev);
+        lexp(lev);
         int cx2 = cx;
         gen(JPC,0,0);
         if (word->value=="do"&&word->key=="keyword"){
@@ -778,7 +789,7 @@ void statement(int ctx, int lev){
             //     word++;
             // }   
         }
-        statement(ctx,lev);
+        statement(lev);
         gen(JMP,0,cx1);     //无条件跳回while
         code[cx2].a = cx;   //条件不满足 跳出循环
     }
@@ -825,7 +836,7 @@ void statement(int ctx, int lev){
                 last = 1;
             }
             else if (word->value!=","&&last==1){ //exp
-                exp(ctx,lev);
+                exp(lev);
                 gen(OPR,0,7);   //把形参送入栈
                 cx_temp--;
                 last = 0;
@@ -922,7 +933,7 @@ void statement(int ctx, int lev){
         else{
             sendError(15); //missing (
         }
-        exp(ctx,lev);
+        exp(lev);
         gen(WRT,0,0);  //输出值
         gen(OPR,0,15); //换行
         int last=0;  //,|exp
@@ -932,7 +943,7 @@ void statement(int ctx, int lev){
                 last = 1;
             }
             else if (word->value!=","&&last==1){ //exp
-                exp(ctx,lev);
+                exp(lev);
                 gen(WRT,0,0);  //输出值
                 gen(OPR,0,15); //换行
                 last = 0;
@@ -962,7 +973,7 @@ void statement(int ctx, int lev){
     }
       
     else if (word->value=="begin"){
-        body(ctx,lev);
+        body(lev);
     }
     else{
         sendError(24); //unknown statement
@@ -976,19 +987,19 @@ void statement(int ctx, int lev){
 /*
 <lexp> -> <exp> <lop> <exp>|odd <exp>
 */
-void lexp(int ctx, int lev){
+void lexp(int lev){
     string temp;
     if (word->value=="odd"){
         word++;
-        exp(ctx,lev);
+        exp(lev);
         gen(OPR,0,6);
     }
     else{
-        exp(ctx,lev);
+        exp(lev);
         if (word->key=="LOP"){
             temp = word->value;
             word++;
-            exp(ctx,lev);
+            exp(lev);
         }
         else{
             sendError(22); //Missing the compare operator
@@ -1011,14 +1022,14 @@ void lexp(int ctx, int lev){
 /*
 <exp> -> [+|-]<term>{<aop><term>}
 */
-void exp(int ctx, int lev){
+void exp(int lev){
 	int temp = 0;
     if (word->key=="AOP"){  //+|-
         if (word->value =="-")
             temp = 1;
         word++;
     }
-    term(ctx,lev);
+    term(lev);
     if (temp==1)
         gen(OPR,0,1);   //栈顶取反
     while (word->key=="AOP"){
@@ -1027,7 +1038,7 @@ void exp(int ctx, int lev){
         else
             temp = 0;
         word++;
-        term(ctx,lev);
+        term(lev);
         if (temp==1)
             gen(OPR,0,3);
         else
@@ -1038,13 +1049,13 @@ void exp(int ctx, int lev){
 /*
 <term> -> <factor>{<mop><factor>}
 */
-void term(int ctx, int lev){
+void term(int lev){
     string temp;
-    factor(ctx,lev);
-    if(word->key=="MOP"){
+    factor(lev);
+    while (word->key=="MOP"){
         temp = word->value;
         word++;
-        factor(ctx,lev);
+        factor(lev);
         if (temp=="*")
             gen(OPR,0,4);
         else //if (temp=="/")
@@ -1055,7 +1066,7 @@ void term(int ctx, int lev){
 /*
 <factor> -> <id>|<integer>|(<exp>)
 */
-void factor(int ctx, int lev){
+void factor(int lev){
     if (word->key=="ID"){
         int i = position(word->value);
         if (i==-1)
@@ -1074,7 +1085,7 @@ void factor(int ctx, int lev){
     }
     else if (word->key=="("&&word->value=="SOP"){
         word++;
-        exp(ctx,lev);
+        exp(lev);
         if (word->key==")"&&word->value=="SOP"){
             word++;
         }
@@ -1085,6 +1096,37 @@ void factor(int ctx, int lev){
     else{
         sendError(23); //Wrong factor members
     }
+}
+
+void printtable(){
+    fstream fp;
+    fp.open("table.txt",ios::out);
+    if (!fp){
+        fp << "table文件打开失败！" << endl;
+        exit(0);
+    }
+    fp << "\t名称\t类型\t\t值\t空间\t层\t偏移量" << endl;
+    for (int i=0; i<ptx; i++)
+    {
+        fp << i << "\t";
+        fp << table[i].name << "\t";
+        switch(table[i].kind){
+            case constant:
+                fp << "constant\t\t";
+                fp << table[i].val << "\t\t";
+                break;
+            case variable:
+                fp << "var\t\t";
+                fp << " \t\t";
+                break;
+            case procedure:
+                fp << "procedure\t";
+                fp << table[i].val << "\t" << table[i].size << "\t";
+                break;
+        }
+        fp << table[i].level << "\t" << table[i].adr << endl;
+    }
+    fp.close();
 }
 
 void openfile(){
@@ -1284,12 +1326,14 @@ void GA(){
     }
     
     prog();
+    printtable();
     
     if (ga_error==0){
         cout << "0error!" << endl;
         cout << "successfully compiled..." << endl;
         cout << "********************** 目 标 代 码 **********************" << endl;
         print_code();
+        
         interpret();
     }
     closefile();
