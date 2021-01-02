@@ -31,6 +31,7 @@ enum object{
     constant, variable, procedure
 };
 
+
 struct tablestruct{
     string name;        //Ãû×Ö
     enum object kind;   //ÀàĞÍ£ºconstant, variable, procedure, array
