@@ -92,10 +92,6 @@ void enter(enum object k, int lev, int &pdx)
     switch(k)
     {
         case constant:  //常量
-            // if (num>amax)
-            // {
-            //     sendError();  //数字越界
-            // }
             table[ptx].level = lev;
             break;
         case variable:  //变量
@@ -127,10 +123,12 @@ int position(string idt)
     return -1;
 }
 
+//在当前层找
 int find_in_cur(string idt)
 {
     int i = ptx-1;
     int lnow = table[i].level;
+    i--;
     while (i>=0&&table[i].level==lnow)
     {
         if (table[i].name==idt)
@@ -299,6 +297,9 @@ void sendError(int type){
         case 30:
             cout  <<"division error" << endl;
             break; 
+        case 31:
+            cout  <<"[Semantic ERROR] "<< " [" << word->row << "," << word->col << "] " <<"Reassignment" << endl;
+            break; 
         default:
             cout << "[Grammer ERROR] [" <<  word->row << "," << word->col << "] " << "Unknown wrong" << endl;
             break;
@@ -404,8 +405,9 @@ void vardecl(int lev, int &dx){
         int i = find_in_cur(word->value);
         if (i==-1)
             enter(variable,lev,dx);
-        else
+        else{
             sendError(26);
+        }
         word++;
     }
     else{
@@ -424,7 +426,12 @@ void vardecl(int lev, int &dx){
             last = 1;
         }
         else if (word->key=="ID"&&last==1){
-            enter(variable,lev,dx);
+            int i = find_in_cur(word->value);
+            if (i==-1)
+                enter(variable,lev,dx);
+            else{
+                sendError(26);
+            }
             word++;
             last = 0;
         }
@@ -720,6 +727,8 @@ void statement(int lev){
         int i = position(word->value);
         if (i==-1)
             sendError(27);  //未定义
+        else if (table[i].kind==constant)
+            sendError(31);
         else if (table[i].kind!=variable)
             sendError(28);  //类型错误
         word++;
@@ -826,9 +835,11 @@ void statement(int lev){
                 sendError(15); //missing (
             }
         } 
-        int cx_temp;
-        if (i!=-1)
+        int cx_temp,cx_temp1;
+        if (i!=-1){
             cx_temp = table[i].val;  //参数个数
+            cx_temp1 = cx_temp;
+        }
         int last=1;  //,|id
         while(word->value==","||word->key=="AOP"||word->key=="ID"||word->key=="INT"||word->value=="("){
             if (word->value==","&&last==0){  //,
@@ -837,7 +848,7 @@ void statement(int lev){
             }
             else if (word->value!=","&&last==1){ //exp
                 exp(lev);
-                gen(OPR,0,7);   //把形参送入栈
+                //gen(OPR,0,7);   //把形参送入栈
                 cx_temp--;
                 last = 0;
             }
@@ -852,8 +863,10 @@ void statement(int lev){
         }
         if (cx_temp!=0)
             sendError(29);   //参数不匹配
-        if (i!=-1)
+        if (i!=-1){
+            gen(OPR,1,cx_temp1);
             gen(CAL,lev-table[i].level,table[i].adr);
+        }
         if (word->value==")"&&(last==0||last==1&&(word-1)->value=="(")){
             word++;
         }
@@ -1175,85 +1188,94 @@ void interpret(){
                 t++;
                 break;
             case OPR:   //运算
-                switch(code[i].a)
-                {
-                    case 0:   //返回调用点并退栈
-                        t = b;
-                        p = S[b+2];  //RA 返回地址
-                        b = S[b+1];  //DL 动态链 前面的基址
-                        break;
-                    case 1:   //栈顶取反
-                        S[t-1] = -S[t-1]; 
-                        break;
-                    case 2:   //次栈顶与栈顶相加
+                if (code[i].l==1){
+                    int num = code[i].a;
+                    while (num--){
                         t--;
-                        S[t-1] = S[t-1]+S[t];
-                        break;
-                    case 3:   //次栈顶减栈顶
-                        t--;
-                        S[t-1] = S[t-1]-S[t];
-                        break;
-                    case 4:   //次栈顶乘栈顶
-                        t--;
-                        S[t-1] = S[t-1]*S[t];
-                        break;
-                    case 5:   //次栈顶除栈顶
-                        t--;
-                        if (S[t]==0)
-                        {
-                            sendError(30);  //除数为0
-                            return;
-                        }
-                        S[t-1] = S[t-1]/S[t];
-                        break;
-                    case 6:   //栈顶元素的奇偶性判断
-                        S[t-1] = S[t-1]%2;
-                        break;
-                    case 7:
-                        if (t+temp>=stacksize)
-                        {
-                            return;
-                        }
-                        t--;
-                        S[t+temp]=S[t];
-                        temp++;
-                        break;
-                    case 8:   //是否相等
-                        t--;
-                        S[t-1] = (S[t-1]==S[t]);
-                        break;
-                    case 9:   //是否不等
-                        t--;
-                        S[t-1] = (S[t-1]!=S[t]);
-                        break;
-                    case 10:   //小于判定
-                        t--;
-                        S[t-1] = (S[t-1]<S[t]);
-                        break;
-                    case 11:   //大于等于判定
-                        t--;
-                        S[t-1] = (S[t-1]>=S[t]);
-                        break;
-                    case 12:   //大于判定   
-                        t--;
-                        S[t-1] = (S[t-1]>S[t]);
-                        break;       
-                    case 13:   //小于等于判定
-                        t--;
-                        S[t-1] = (S[t-1]<=S[t]);
-                        break;      
-                    case 14:   //栈顶值输出
-                        t--;
-                        cout << S[t];
-                        break;
-                    case 15:   //屏幕输出换行
-                        cout << endl;
-                        break;
-                    case 16:   //从命令行读入一个数字输入到栈顶
-                        //cout << "请输入数值：";
-                        cin >> S[t];
-                        t++;
-                        break;
+                        S[t+3] = S[t];
+                    }
+                }
+                else{
+                    switch(code[i].a)
+                    {
+                        case 0:   //返回调用点并退栈
+                            t = b;
+                            p = S[b+2];  //RA 返回地址
+                            b = S[b+1];  //DL 动态链 前面的基址
+                            break;
+                        case 1:   //栈顶取反
+                            S[t-1] = -S[t-1]; 
+                            break;
+                        case 2:   //次栈顶与栈顶相加
+                            t--;
+                            S[t-1] = S[t-1]+S[t];
+                            break;
+                        case 3:   //次栈顶减栈顶
+                            t--;
+                            S[t-1] = S[t-1]-S[t];
+                            break;
+                        case 4:   //次栈顶乘栈顶
+                            t--;
+                            S[t-1] = S[t-1]*S[t];
+                            break;
+                        case 5:   //次栈顶除栈顶
+                            t--;
+                            if (S[t]==0)
+                            {
+                                sendError(30);  //除数为0
+                                return;
+                            }
+                            S[t-1] = S[t-1]/S[t];
+                            break;
+                        case 6:   //栈顶元素的奇偶性判断
+                            S[t-1] = S[t-1]%2;
+                            break;
+                        case 7:
+                            // if (t+temp>=stacksize)
+                            // {
+                            //     return;
+                            // }
+                            // t--;
+                            // S[t+temp]=S[t];
+                            // temp++;
+                            break;
+                        case 8:   //是否相等
+                            t--;
+                            S[t-1] = (S[t-1]==S[t]);
+                            break;
+                        case 9:   //是否不等
+                            t--;
+                            S[t-1] = (S[t-1]!=S[t]);
+                            break;
+                        case 10:   //小于判定
+                            t--;
+                            S[t-1] = (S[t-1]<S[t]);
+                            break;
+                        case 11:   //大于等于判定
+                            t--;
+                            S[t-1] = (S[t-1]>=S[t]);
+                            break;
+                        case 12:   //大于判定   
+                            t--;
+                            S[t-1] = (S[t-1]>S[t]);
+                            break;       
+                        case 13:   //小于等于判定
+                            t--;
+                            S[t-1] = (S[t-1]<=S[t]);
+                            break;      
+                        case 14:   //栈顶值输出
+                            t--;
+                            cout << S[t];
+                            break;
+                        case 15:   //屏幕输出换行
+                            cout << endl;
+                            break;
+                        case 16:   //从命令行读入一个数字输入到栈顶
+                            //cout << "请输入数值：";
+                            cin >> S[t];
+                            t++;
+                            break;
+                    }
                 }
                 break;
 
@@ -1290,13 +1312,16 @@ void interpret(){
                 int temp;
                 cin >> temp;
                 S[base(code[i].l,S,b)+code[i].a] = temp;
-               // *(S.base+B+2+code[i].a) = temp; 怎么算
                 break;
             case WRT:   //将栈顶内容输出
                 t--;
                 cout << S[t];
                 break;
         }
+        // for (int i=0; i<t; i++){
+        //     cout << S[i] << " ";
+        // }
+        // cout << endl;
     }while(p!=0);
 }
 
