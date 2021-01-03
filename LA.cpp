@@ -91,7 +91,7 @@ void LA()
     string inputFileName;
     cout << "Please input the file name:";
     cin >> inputFileName;
-    //inputFileName = "1.txt";
+    //inputFileName = "7.txt";
     cout << endl;
     cout << "********************* Lexical Analysis *********************" << endl;
     //¶ÁÎÄ¼þ
@@ -262,8 +262,19 @@ void LA()
         }
         else if (ch == '/')
         {
-            col++;
-            output << "$MOP  " << ch << " " << row << " " << col << endl;
+            ch = text[fi++];
+            if (ch=='/'){            //×¢ÊÍ
+                col++;
+                ch = text[fi++];
+                while (ch!='\n'){
+                    ch = text[fi++];
+                }
+                Retract();
+            }
+            else{
+                Retract();
+                output << "$MOP  " << '/' << " " << row << " " << col << endl;
+            }
         }
         else if (ch == ';')
         {
@@ -272,8 +283,21 @@ void LA()
         }
         else if (ch == '(' || ch == ')' || ch == ',')
         {
-            col++;
-            output << "$SOP  " << ch << " " << row << " " << col << endl;
+            char temp = ch;
+            ch = text[fi++];
+            if (ch=='*'){
+                col++;
+                ch = text[fi++];
+                while ((ch!='*'||text[fi+1]!=')')&&(fi<fcnt)){
+                    ch = text[fi++];
+                }
+                ch = text[fi++];
+            }
+            else
+            {
+                Retract();
+                output << "$SOP  " << temp << " " << row << " " << col << endl;
+            }
         }
         else
         {
