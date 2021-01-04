@@ -13,6 +13,7 @@ int la_error=0;
 char text[3000];
 int fcnt=0;
 int fi=0;
+char ch;
 
 bool isDigit(char ch) //是否为数字
 {
@@ -108,7 +109,6 @@ void LA()
         cout << "Can't open the output file!" << endl;
         exit(0);
     }
-    char ch;
     ch = input.get();
     while (!input.eof())
     {
@@ -302,7 +302,7 @@ void LA()
         else
         {
         	col_error = col;
-            while (!ischar(ch)&&!isLetter(ch)&&!input.eof())
+            while (!ischar(ch)&&!isLetter(ch)&&fi!=fcnt)
             {
             	col++;
             	if (ch<0){ //汉字首字节 
