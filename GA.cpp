@@ -34,7 +34,7 @@ enum object{
 
 struct tablestruct{
     string name;        //名字
-    enum object kind;   //类型：constant, variable, procedure, array
+    enum object kind;   //类型：constant, variable, procedure
     int val;            //数值，const
     int level;          //嵌套层次
     int adr;            //地址
@@ -235,7 +235,7 @@ void sendError(int type){
             cout << "[Grammar ERROR] "<< " [" << word->row << "," << word->col << "] " <<"Undeclared identifier" << endl;
             break;
         case 10:
-            cout << "[Grammar ERROR] "<< " [" << (word-1)->row << "," << (word-1)->col << "] " <<"Missing ID" << endl;
+            cout << "[Grammar ERROR] "<< " [" << (word-1)->row << "," << (word-1)->col << "] " <<"Missing ID" << endl;//
             break;
         case 11:
             cout << "[Grammar ERROR] "<< " [" << word->row << "," << word->col << "] " <<"Invalid ID" << endl;
@@ -295,7 +295,7 @@ void sendError(int type){
             cout << "[Semantic ERROR] "<< " [" << word->row << "," << word->col << "] " <<"parameter mismatch" << endl;
             break; 
         case 30:
-            cout  <<"division error" << endl;
+            cout  <<"[Semantic ERROR] " << " [" << word->row << "," << word->col << "] " << "division error" << endl;
             break; 
         case 31:
             cout  <<"[Semantic ERROR] "<< " [" << word->row << "," << word->col << "] " <<"Reassignment" << endl;
@@ -358,7 +358,7 @@ void prog(){
 void block(int lev, int dxx, int txx){
     int dx=dxx;
     table[txx].adr = cx;
-    int ctemp = cx;
+    int ctemp = cx;   //记住跳转指令的位置，等待回填
     gen(JMP,0,0);
 
     if (word->value=="const"&&word->key=="keyword"){
@@ -387,7 +387,7 @@ void block(int lev, int dxx, int txx){
         word++;
     }
 
-   // code[table[txx].adr].a = cx;  //生成当前过程的代码
+
     code[ctemp].a = cx;
     //cout << cx << endl;
     gen(INT,0,dx);   //分配内存
@@ -1144,13 +1144,8 @@ void printtable(){
 
 void openfile(){
     gainput.open("la_out.txt",ios::in);
-    gaoutput.open("ga_output.txt",ios::out | ios::trunc);
     if (!gainput.is_open()){
         cout << "Can't open the la_out.txt!" << endl;
-        exit(0); 
-    }
-    if (!gaoutput.is_open()){
-        cout << "Can't open the ga_out.txt!" << endl;
         exit(0); 
     }
 }
@@ -1231,13 +1226,6 @@ void interpret(){
                             S[t-1] = S[t-1]%2;
                             break;
                         case 7:
-                            // if (t+temp>=stacksize)
-                            // {
-                            //     return;
-                            // }
-                            // t--;
-                            // S[t+temp]=S[t];
-                            // temp++;
                             break;
                         case 8:   //是否相等
                             t--;
@@ -1327,23 +1315,10 @@ void interpret(){
 
 void closefile(){
     gainput.close();
-    gaoutput.close();
 }
 
 void GA(){
     openfile();
-
-    //header
-    time_t curTime;
-    struct tm *timeinfo;
-    time(&curTime);
-    timeinfo = localtime(&curTime);
-
-    gaoutput << "# Grammer Analysis Result #" << endl;
-    gaoutput << "Generate Time: " << asctime(timeinfo);
-    gaoutput << "Language Set: PL/0" << endl;
-    gaoutput << "***************************************************" << endl; 
-    gaoutput << endl;
 
 	cout << "********************* Grammer Analysis *********************" << endl;
     while(gainput.peek()!=EOF){
